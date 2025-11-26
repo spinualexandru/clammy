@@ -1,7 +1,7 @@
 use chrono::Local;
-use iced::time;
-use iced::widget::text;
+use iced::widget::{container, text};
 use iced::{Element, Subscription};
+use iced::{Length, time};
 
 #[derive(Debug, Clone)]
 pub struct Clock {
@@ -31,17 +31,19 @@ impl Clock {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        text(self.current_time.format("%H:%M:%S").to_string())
-            .style(|theme: &iced::Theme| {
-                text::Style {
-                    color: Some(theme.palette().text),
-                }
-            })
+        let clock_text = text(self.current_time.format("%a %d %b %H:%M").to_string()).style(
+            |theme: &iced::Theme| text::Style {
+                color: Some(theme.palette().text),
+            },
+        );
+
+        container(clock_text)
+            .center_y(Length::Fill)
+            .padding([0, 8])
             .into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        time::every(std::time::Duration::from_millis(1000))
-            .map(|_| Message::Tick(Local::now()))
+        time::every(std::time::Duration::from_millis(1000)).map(|_| Message::Tick(Local::now()))
     }
 }

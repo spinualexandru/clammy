@@ -1,3 +1,4 @@
 pub mod clock;
-pub mod workspaces;
+pub mod system_tray;
 pub mod window_title;
+pub mod workspaces;

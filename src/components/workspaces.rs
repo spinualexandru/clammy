@@ -12,7 +12,7 @@ use hyprland::event_listener::AsyncEventListener;
 use hyprland::shared::{HyprData, HyprDataActive, WorkspaceId};
 use iced::futures::SinkExt;
 use iced::stream;
-use iced::widget::{button, container, text, Row};
+use iced::widget::{Row, button, container, text};
 use iced::{Border, Color, Element, Length, Subscription, Task};
 use std::future;
 
@@ -216,32 +216,27 @@ impl Workspaces {
         status: button::Status,
         is_active: bool,
     ) -> button::Style {
-        let (background, border_color, text_color) = match (is_active, status) {
-            (true, _) => (
-                Some(Color::from_rgba(0.0, 0.0, 0.0, 0.0).into()),
-                Color::BLACK,
-                Color::BLACK,
-            ),
-            (false, button::Status::Hovered) => (
-                Some(Color::from_rgba(0.0, 0.0, 0.0, 0.0).into()),
-                Color::BLACK,
-                Color::BLACK,
-            ),
-            (false, button::Status::Pressed) => (
-                Some(Color::from_rgba(0.0, 0.0, 0.0, 0.0).into()),
-                Color::BLACK,
-                Color::BLACK,
-            ),
-            (false, _) => (None, Color::BLACK, Color::BLACK),
+        // Tokyo Night colors
+        let accent = Color::from_rgb8(0x7a, 0xa2, 0xf7);   // Blue accent
+        let text_color = Color::from_rgb8(0xc0, 0xca, 0xf5); // Foreground
+        let muted = Color::from_rgb8(0x56, 0x5f, 0x89);     // Muted text
+        let hover_bg = Color::from_rgba8(0x41, 0x48, 0x68, 0.5); // Hover background
+
+        let (background, border_color, txt) = match (is_active, status) {
+            (true, _) => (None, accent, text_color),
+            (false, button::Status::Hovered | button::Status::Pressed) => {
+                (Some(hover_bg.into()), muted, text_color)
+            }
+            (false, _) => (None, Color::TRANSPARENT, muted),
         };
 
         button::Style {
             background,
-            text_color,
+            text_color: txt,
             border: Border {
                 color: border_color,
                 width: 2.0,
-                radius: 0.0.into(),
+                radius: 4.0.into(),
             },
             shadow: Default::default(),
         }
@@ -262,7 +257,7 @@ impl Workspaces {
                 Box::pin(async move {
                     let _ = output.send(Message::Refresh).await;
                 })
-                    as std::pin::Pin<Box<dyn std::future::Future<Output=()> + Send>>
+                    as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
             }
         };
 
