@@ -1,6 +1,6 @@
 [package]
 name = "clammy"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 
 [dependencies]
@@ -18,19 +18,3 @@ system-tray = "0.8"
 [[bin]]
 name = "clammy"
 type = "bin"
-
-[profile.release]
-# More aggressive optimizations (default is 3)
-opt-level = "z"  # Optimize for size ("s" is also good, "z" is more aggressive)
-
-# Enable Link Time Optimization - optimizes across crate boundaries
-lto = true
-
-# Reduce number of codegen units for better optimization (default is 16)
-codegen-units = 1
-
-# Strip debug symbols from binary
-strip = true
-
-# Abort on panic instead of unwinding (smaller binary)
-panic = "abort"

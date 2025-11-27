@@ -10,15 +10,16 @@
 - [ ] Make tray popup seem like it's connecting with the bar
 
 #### Workspaces
-- [ ] Make the workspace change look animated
+- [x] Make the workspace change look animated
 
 #### Clock
 - [ ] Dropdown Clock
 
 ### Gemeral
+- [x] Sync colors from Matugen
 
 #### Performance
-- [ ] Improve memory usage
+- [x] Improve memory usage
 
 #### Nice to have
 - [ ] Sync the border of the status bar with the laptop
