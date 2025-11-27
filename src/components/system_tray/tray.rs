@@ -269,23 +269,23 @@ impl SystemTray {
 
     /// Render the system tray component.
     pub fn view(&self) -> Element<'_, Message> {
-        // Collect SNI icons
-        let sni_icons: Vec<Element<'_, Message>> = self
-            .items
-            .values()
-            .map(|item| self.render_tray_item(item))
-            .collect();
+        // Pre-allocate a single Vec for all icons
+        let total_items = self.items.len() + self.custom_indicators.len();
+        let mut all_icons = Vec::with_capacity(total_items);
 
-        // Collect custom indicator icons
-        let custom_icons: Vec<Element<'_, Message>> = self
-            .custom_indicators
-            .iter()
-            .map(|ind| self.render_custom_indicator(ind))
-            .collect();
+        // Add SNI icons
+        all_icons.extend(
+            self.items
+                .values()
+                .map(|item| self.render_tray_item(item))
+        );
 
-        // Combine all icons
-        let all_icons: Vec<Element<'_, Message>> =
-            sni_icons.into_iter().chain(custom_icons).collect();
+        // Add custom indicators
+        all_icons.extend(
+            self.custom_indicators
+                .iter()
+                .map(|ind| self.render_custom_indicator(ind))
+        );
 
         let icons_row = Row::from_vec(all_icons)
             .spacing(4)

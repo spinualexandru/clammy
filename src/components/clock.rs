@@ -6,6 +6,7 @@ use iced::{Length, time};
 #[derive(Debug, Clone)]
 pub struct Clock {
     current_time: chrono::DateTime<Local>,
+    formatted_buffer: String,
 }
 
 #[derive(Debug, Clone)]
@@ -15,8 +16,10 @@ pub enum Message {
 
 impl Default for Clock {
     fn default() -> Self {
+        let now = Local::now();
         Self {
-            current_time: Local::now(),
+            current_time: now,
+            formatted_buffer: now.format("%a %d %b %H:%M").to_string(),
         }
     }
 }
@@ -26,12 +29,16 @@ impl Clock {
         match message {
             Message::Tick(time) => {
                 self.current_time = time;
+                // Reuse buffer - clear() doesn't deallocate capacity
+                self.formatted_buffer.clear();
+                use std::fmt::Write;
+                let _ = write!(&mut self.formatted_buffer, "{}", time.format("%a %d %b %H:%M"));
             }
         }
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let clock_text = text(self.current_time.format("%a %d %b %H:%M").to_string()).style(
+        let clock_text = text(&self.formatted_buffer).style(
             |theme: &iced::Theme| text::Style {
                 color: Some(theme.palette().text),
             },

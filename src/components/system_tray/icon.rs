@@ -101,11 +101,12 @@ fn argb32_to_rgba(argb: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 /// Look up an icon using the freedesktop icon theme specification.
-fn lookup_freedesktop_icon(name: &str) -> Option<PathBuf> {
-    freedesktop_icons::lookup(name)
-        .with_size(ICON_SIZE as u16)
-        .with_cache()
-        .find()
+///
+/// Note: Freedesktop icon lookup has been disabled to reduce memory usage.
+/// Most apps provide icon pixmaps or custom theme paths, so this fallback
+/// is rarely needed. If an icon doesn't appear, the app should provide pixmap data.
+fn lookup_freedesktop_icon(_name: &str) -> Option<PathBuf> {
+    None  // Disabled for memory optimization
 }
 
 /// Find an icon in a custom theme path provided by the SNI item.

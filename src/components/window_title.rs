@@ -9,6 +9,7 @@ use std::future;
 pub struct WindowTitle {
     title: Option<String>,
     class: Option<String>,
+    display_text: String,  // Cached display string
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,7 @@ impl Default for WindowTitle {
         Self {
             title: None,
             class: None,
+            display_text: String::new(),
         }
     }
 }
@@ -31,28 +33,25 @@ impl WindowTitle {
             Message::ActiveWindowChanged(title, class) => {
                 self.title = title;
                 self.class = class;
+
+                // Update cached display text
+                self.display_text.clear();
+                if let (Some(t), Some(c)) = (&self.title, &self.class) {
+                    use std::fmt::Write;
+                    let _ = write!(&mut self.display_text, "{} - {}", c, t);
+                }
             }
         }
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        if let (Some(title), Some(class)) = (&self.title, &self.class) {
-            text(format!("{} - {}", class, title))
-                .style(|theme: &iced::Theme| {
-                    text::Style {
-                        color: Some(theme.palette().text),
-                    }
-                })
-                .into()
-        } else {
-            text("")
-                .style(|theme: &iced::Theme| {
-                    text::Style {
-                        color: Some(theme.palette().text),
-                    }
-                })
-                .into()
-        }
+        text(&self.display_text)
+            .style(|theme: &iced::Theme| {
+                text::Style {
+                    color: Some(theme.palette().text),
+                }
+            })
+            .into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {

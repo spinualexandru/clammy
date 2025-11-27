@@ -6,6 +6,9 @@ use iced::widget::{button, column, container, row, text, Space};
 use iced::{Border, Color, Element, Length};
 use system_tray::menu::{MenuItem as SniMenuItem, MenuType, ToggleState, TrayMenu};
 
+/// Maximum menu nesting depth to prevent stack overflow and memory exhaustion
+const MAX_MENU_DEPTH: usize = 5;
+
 /// Simplified menu item for Iced rendering.
 #[derive(Debug, Clone)]
 pub struct MenuItem {
@@ -27,11 +30,11 @@ pub struct MenuItem {
 
 /// Convert an SNI TrayMenu to a list of simplified menu items.
 pub fn convert_menu(menu: &TrayMenu) -> Vec<MenuItem> {
-    menu.submenus.iter().map(convert_menu_item).collect()
+    menu.submenus.iter().map(|item| convert_menu_item(item, 0)).collect()
 }
 
 /// Convert a single SNI menu item to our simplified format.
-fn convert_menu_item(item: &SniMenuItem) -> MenuItem {
+fn convert_menu_item(item: &SniMenuItem, depth: usize) -> MenuItem {
     let is_separator = matches!(item.menu_type, MenuType::Separator);
     let is_checked = matches!(item.toggle_state, ToggleState::On);
     let is_checkable = !matches!(
@@ -46,6 +49,13 @@ fn convert_menu_item(item: &SniMenuItem) -> MenuItem {
         .unwrap_or_default()
         .replace('_', "");
 
+    // Stop recursion at max depth to prevent stack overflow
+    let submenu = if depth < MAX_MENU_DEPTH {
+        item.submenu.iter().map(|sub| convert_menu_item(sub, depth + 1)).collect()
+    } else {
+        Vec::new()  // Truncate deeply nested menus
+    };
+
     MenuItem {
         id: item.id,
         label,
@@ -53,7 +63,7 @@ fn convert_menu_item(item: &SniMenuItem) -> MenuItem {
         is_separator,
         is_checkable,
         is_checked,
-        submenu: item.submenu.iter().map(convert_menu_item).collect(),
+        submenu,
     }
 }
 

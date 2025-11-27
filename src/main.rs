@@ -50,7 +50,7 @@ pub fn main() -> Result<(), iced_layershell::Error> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WindowType {
     Main,
-    TrayMenu(usize), // Index into menu_data
+    TrayMenu,
 }
 
 struct StatusBar {
@@ -61,8 +61,8 @@ struct StatusBar {
     system_tray: system_tray::SystemTray,
     /// Track window IDs and their types
     windows: HashMap<Id, WindowType>,
-    /// Store menu data for popup windows
-    menu_data: Vec<(String, Vec<system_tray::menu::MenuItem>)>, // (address, items)
+    /// Store menu data for popup windows (keyed by popup ID)
+    menu_data: HashMap<Id, (String, Vec<system_tray::menu::MenuItem>)>,
 }
 
 #[to_layer_message(multi)]
@@ -99,7 +99,7 @@ impl StatusBar {
                 window_title: window_title::WindowTitle::default(),
                 system_tray: system_tray::SystemTray::default(),
                 windows: HashMap::new(),
-                menu_data: Vec::new(),
+                menu_data: HashMap::new(),
             },
             Task::done(workspaces::Message::Refresh).map(Message::Workspaces),
         )
@@ -114,9 +114,10 @@ impl StatusBar {
     }
 
     fn remove_id(&mut self, id: Id) {
-        if let Some(WindowType::TrayMenu(_idx)) = self.windows.remove(&id) {
-            // Clean up menu data if this was the last reference
-            // For simplicity, we'll just leave it (could optimize later)
+        if let Some(window_type) = self.windows.remove(&id) {
+            if matches!(window_type, WindowType::TrayMenu) {
+                self.menu_data.remove(&id);
+            }
         }
     }
 
@@ -146,17 +147,16 @@ impl StatusBar {
                 self.system_tray.update(msg).map(Message::SystemTray)
             }
             Message::OpenTrayMenu { address, items } => {
-                // Store menu data
-                let menu_idx = self.menu_data.len();
-                self.menu_data.push((address, items));
-
                 // Create popup window
                 let id = Id::unique();
-                self.windows.insert(id, WindowType::TrayMenu(menu_idx));
 
                 // Calculate menu height (roughly 24px per item + padding)
-                let item_count = self.menu_data[menu_idx].1.len();
+                let item_count = items.len();
                 let height = (item_count as u32 * 28) + 16;
+
+                // Store menu data keyed by popup ID
+                self.menu_data.insert(id, (address, items));
+                self.windows.insert(id, WindowType::TrayMenu);
 
                 Task::done(Message::NewMenu {
                     settings: IcedNewMenuSettings {
@@ -195,7 +195,7 @@ impl StatusBar {
                     if let Some((&id, _)) = self
                         .windows
                         .iter()
-                        .find(|(_, wt)| matches!(wt, WindowType::TrayMenu(_)))
+                        .find(|(_, wt)| matches!(wt, WindowType::TrayMenu))
                     {
                         return Task::done(Message::ClosePopup(id));
                     }
@@ -208,7 +208,7 @@ impl StatusBar {
 
     fn view(&self, id: Id) -> Element<'_, Message> {
         match self.windows.get(&id) {
-            Some(WindowType::TrayMenu(menu_idx)) => self.view_tray_menu(id, *menu_idx),
+            Some(WindowType::TrayMenu) => self.view_tray_menu(id),
             _ => self.view_main(),
         }
     }
@@ -254,8 +254,8 @@ impl StatusBar {
             .into()
     }
 
-    fn view_tray_menu(&self, popup_id: Id, menu_idx: usize) -> Element<'_, Message> {
-        let (address, items) = match self.menu_data.get(menu_idx) {
+    fn view_tray_menu(&self, popup_id: Id) -> Element<'_, Message> {
+        let (address, items) = match self.menu_data.get(&popup_id) {
             Some(data) => data,
             None => {
                 return container(text("Menu not found"))

@@ -36,6 +36,7 @@ pub(crate) struct WorkspaceInfo {
     pub(crate) name: String,
     pub(crate) monitor: String,
     pub(crate) windows: u16,
+    id_string: String,  // Cached for rendering
 }
 
 /// Messages that the Workspaces component can handle.
@@ -145,6 +146,7 @@ impl Workspaces {
                     .into_iter()
                     .map(|w| WorkspaceInfo {
                         id: w.id,
+                        id_string: w.id.to_string(),  // Cache once
                         name: w.name,
                         monitor: w.monitor,
                         windows: w.windows,
@@ -194,12 +196,12 @@ impl Workspaces {
     }
 
     /// Create a single workspace button.
-    fn create_workspace_button(
+    fn create_workspace_button<'a>(
         &self,
-        workspace: &WorkspaceInfo,
+        workspace: &'a WorkspaceInfo,
         is_active: bool,
-    ) -> Element<'_, Message> {
-        let label = text(workspace.id.to_string()).size(13);
+    ) -> Element<'a, Message> {
+        let label = text(&workspace.id_string).size(13);
 
         button(label)
             .padding([5, 8])
