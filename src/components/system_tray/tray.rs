@@ -16,6 +16,7 @@ use tokio::sync::mpsc;
 
 use super::icon::{self, ICON_SIZE};
 use super::menu::{self, MenuItem};
+use crate::theme::get_theme;
 
 // ============================================================================
 // Types
@@ -321,10 +322,15 @@ impl SystemTray {
 
         let address = item.address.clone();
 
-        // Tokyo Night colors
-        let hover_bg = Color::from_rgba8(0x41, 0x48, 0x68, 0.5);  // Hover background
-        let active_bg = Color::from_rgba8(0x41, 0x48, 0x68, 0.75); // Active/pressed background
-        let text_color = Color::from_rgb8(0xc0, 0xca, 0xf5);       // Foreground
+        // Get theme colors
+        let theme = get_theme();
+        let hover_bg = theme.hover();
+        let active_bg = {
+            // Slightly more opaque version for active state
+            let c = theme.hover();
+            Color::from_rgba(c.r, c.g, c.b, c.a * 1.5)
+        };
+        let text_color = theme.text();
 
         let btn = button(icon_element)
             .padding(4)
@@ -360,6 +366,7 @@ impl SystemTray {
     /// Render a custom status indicator.
     fn render_custom_indicator<'a>(&'a self, indicator: &'a CustomIndicator) -> Element<'a, Message> {
         let icon_size = Length::Fixed(ICON_SIZE as f32);
+        let text_color = get_theme().text();
 
         let icon_element: Element<'_, Message> = image(indicator.icon.clone())
             .width(icon_size)
@@ -368,10 +375,10 @@ impl SystemTray {
 
         let btn = button(icon_element)
             .padding(2)
-            .style(|_theme, _status| button::Style {
+            .style(move |_theme, _status| button::Style {
                 background: None,
                 border: Border::default(),
-                text_color: Color::WHITE,
+                text_color,
                 shadow: Default::default(),
             });
 

@@ -1,4 +1,5 @@
 mod components;
+mod config;
 mod theme;
 
 use std::collections::HashMap;
@@ -15,7 +16,8 @@ use iced_layershell::reexport::{Anchor, Layer};
 use iced_layershell::settings::LayerShellSettings;
 use iced_layershell::to_layer_message;
 
-use crate::theme::AppTheme;
+use crate::config::{config_subscription, Config, ConfigMessage};
+use crate::theme::{set_global_theme, AppTheme};
 use components::clock;
 use components::system_tray;
 use components::window_title;
@@ -54,6 +56,7 @@ enum WindowType {
 }
 
 struct StatusBar {
+    config: Config,
     app_theme: AppTheme,
     clock: clock::Clock,
     workspaces: workspaces::Workspaces,
@@ -72,6 +75,8 @@ enum Message {
     Workspaces(workspaces::Message),
     WindowTitle(window_title::Message),
     SystemTray(system_tray::Message),
+    /// Config file changed - hot reload
+    ConfigChanged(ConfigMessage),
     /// Open a tray menu popup
     OpenTrayMenu {
         address: String,
@@ -91,9 +96,20 @@ enum Message {
 
 impl StatusBar {
     fn new() -> (Self, Task<Message>) {
+        // Load config (creates default if missing)
+        let config = Config::load().unwrap_or_else(|e| {
+            eprintln!("Failed to load config: {}, using defaults", e);
+            Config::default()
+        });
+        let app_theme = AppTheme::from_config(&config);
+
+        // Set global theme for component access
+        set_global_theme(&app_theme);
+
         (
             Self {
-                app_theme: AppTheme::default(),
+                config,
+                app_theme,
                 clock: clock::Clock::default(),
                 workspaces: workspaces::Workspaces::default(),
                 window_title: window_title::WindowTitle::default(),
@@ -110,7 +126,7 @@ impl StatusBar {
     }
 
     fn theme(&self) -> iced::Theme {
-        self.app_theme.into()
+        (&self.app_theme).into()
     }
 
     fn remove_id(&mut self, id: Id) {
@@ -145,6 +161,19 @@ impl StatusBar {
                     }
                 }
                 self.system_tray.update(msg).map(Message::SystemTray)
+            }
+            Message::ConfigChanged(config_msg) => {
+                match config_msg {
+                    ConfigMessage::Reloaded(new_config) => {
+                        self.config = new_config;
+                        self.app_theme.update(&self.config);
+                        set_global_theme(&self.app_theme);
+                    }
+                    ConfigMessage::Error(e) => {
+                        eprintln!("Config error: {}", e);
+                    }
+                }
+                Task::none()
             }
             Message::OpenTrayMenu { address, items } => {
                 // Create popup window
@@ -232,8 +261,7 @@ impl StatusBar {
             .align_y(iced::Alignment::Center)
             .width(Length::Fill);
 
-        let theme = self.app_theme;
-        let accent = theme.accent();
+        let accent = self.app_theme.accent();
 
         container(content)
             .width(Length::Fill)
@@ -265,12 +293,11 @@ impl StatusBar {
             }
         };
 
-        let theme = self.app_theme;
-        let border_color = theme.border();
-        let hover_color = theme.hover();
-        let text_color = theme.text();
-        let muted_color = theme.muted();
-        let surface_color = theme.surface();
+        let border_color = self.app_theme.border();
+        let hover_color = self.app_theme.hover();
+        let text_color = self.app_theme.text();
+        let muted_color = self.app_theme.muted();
+        let surface_color = self.app_theme.surface();
 
         let menu_items: Vec<Element<'_, Message>> = items
             .iter()
@@ -358,6 +385,7 @@ impl StatusBar {
             self.workspaces.subscription().map(Message::Workspaces),
             self.window_title.subscription().map(Message::WindowTitle),
             self.system_tray.subscription().map(Message::SystemTray),
+            config_subscription().map(Message::ConfigChanged),
             event::listen().map(Message::IcedEvent),
         ])
     }

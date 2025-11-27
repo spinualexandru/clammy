@@ -1,0 +1,27 @@
+# Matugen template for Clammy status bar
+# Place this file in your matugen templates directory
+# (e.g., ~/.config/matugen/templates/clammy.toml)
+#
+# In your matugen config.toml, add:
+# [templates.clammy]
+# input_path = "~/.config/matugen/templates/clammy.toml"
+# output_path = "~/.config/clammy/config.toml"
+
+[theme]
+# Core palette
+background = "{{colors.surface.default.hex}}"
+background_alpha = 0.85
+text = "{{colors.on_surface.default.hex}}"
+success = "{{colors.tertiary.default.hex}}"
+danger = "{{colors.error.default.hex}}"
+
+# Extended colors
+accent = "{{colors.primary.default.hex}}"
+accent2 = "{{colors.secondary.default.hex}}"
+info = "{{colors.tertiary.default.hex}}"
+surface = "{{colors.surface_container.default.hex}}"
+surface_alpha = 0.94
+border = "{{colors.outline.default.hex}}"
+muted = "{{colors.outline_variant.default.hex}}"
+hover = "{{colors.surface_container_high.default.hex}}"
+hover_alpha = 0.5

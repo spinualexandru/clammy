@@ -1,75 +1,122 @@
 use iced::{Color, Theme};
+use std::sync::RwLock;
 
-#[derive(Clone, Copy, Debug)]
-pub enum AppTheme {
-    Dark,
-    Light,
-    Custom,
+use crate::config::{parse_hex_color, parse_hex_color_with_alpha, Config, ThemeConfig};
+
+// Global theme for component access
+static GLOBAL_THEME: RwLock<Option<AppTheme>> = RwLock::new(None);
+
+/// Update the global theme (called when config reloads)
+pub fn set_global_theme(theme: &AppTheme) {
+    if let Ok(mut guard) = GLOBAL_THEME.write() {
+        *guard = Some(theme.clone());
+    }
+}
+
+/// Get a copy of the current global theme
+pub fn get_theme() -> AppTheme {
+    GLOBAL_THEME
+        .read()
+        .ok()
+        .and_then(|guard| guard.clone())
+        .unwrap_or_default()
+}
+
+#[derive(Clone, Debug)]
+pub struct AppTheme {
+    config: ThemeConfig,
 }
 
 impl Default for AppTheme {
     fn default() -> Self {
-        AppTheme::Custom
-    }
-}
-
-impl From<AppTheme> for Theme {
-    fn from(theme: AppTheme) -> Self {
-        match theme {
-            AppTheme::Dark => Theme::Dark,
-            AppTheme::Light => Theme::Light,
-            AppTheme::Custom => Theme::custom(
-                String::from("Tokyo Night"),
-                iced::theme::Palette {
-                    background: Color::from_rgba(0.0, 0.0, 0.0, 0.0), // Transparent for bar
-                    text: Color::from_rgb8(0xc0, 0xca, 0xf5),          // #c0caf5 - foreground
-                    primary: Color::from_rgba8(0x1a, 0x1b, 0x26, 0.85), // #1a1b26 - bg with alpha
-                    success: Color::from_rgb8(0x9e, 0xce, 0x6a),       // #9ece6a - green
-                    danger: Color::from_rgb8(0xf7, 0x76, 0x8e),        // #f7768e - red
-                },
-            ),
+        Self {
+            config: ThemeConfig::default(),
         }
     }
 }
 
 impl AppTheme {
-    /// Blue accent color (#7aa2f7)
+    pub fn from_config(config: &Config) -> Self {
+        Self {
+            config: config.theme.clone(),
+        }
+    }
+
+    /// Update theme from new config
+    pub fn update(&mut self, config: &Config) {
+        self.config = config.theme.clone();
+    }
+
+    /// Blue accent color
     pub fn accent(&self) -> Color {
-        Color::from_rgb8(0x7a, 0xa2, 0xf7)
+        parse_hex_color(&self.config.accent)
     }
 
-    /// Purple accent color (#bb9af7)
+    /// Purple accent color
     pub fn accent2(&self) -> Color {
-        Color::from_rgb8(0xbb, 0x9a, 0xf7)
+        parse_hex_color(&self.config.accent2)
     }
 
-    /// Cyan info color (#7dcfff)
+    /// Cyan info color
     pub fn info(&self) -> Color {
-        Color::from_rgb8(0x7d, 0xcf, 0xff)
+        parse_hex_color(&self.config.info)
     }
 
-    /// Surface/card background (#24283b with alpha)
+    /// Surface/card background with alpha
     pub fn surface(&self) -> Color {
-        Color::from_rgba8(0x24, 0x28, 0x3b, 0.94)
+        parse_hex_color_with_alpha(&self.config.surface, self.config.surface_alpha)
     }
 
-    /// Border color (#414868)
+    /// Border color
     pub fn border(&self) -> Color {
-        Color::from_rgb8(0x41, 0x48, 0x68)
+        parse_hex_color(&self.config.border)
     }
 
-    /// Muted/comment text (#565f89)
+    /// Muted/comment text
     pub fn muted(&self) -> Color {
-        Color::from_rgb8(0x56, 0x5f, 0x89)
+        parse_hex_color(&self.config.muted)
     }
 
-    /// Hover state background (#414868 with alpha)
+    /// Hover state background with alpha
     pub fn hover(&self) -> Color {
-        Color::from_rgba8(0x41, 0x48, 0x68, 0.5)
+        parse_hex_color_with_alpha(&self.config.hover, self.config.hover_alpha)
     }
 
-    /// Foreground/text color (#c0caf5)
+    /// Foreground/text color
     pub fn text(&self) -> Color {
-        Color::from_rgb8(0xc0, 0xca, 0xf5)
+        parse_hex_color(&self.config.text)
+    }
+
+    /// Success/green color
+    pub fn success(&self) -> Color {
+        parse_hex_color(&self.config.success)
+    }
+
+    /// Danger/red color
+    pub fn danger(&self) -> Color {
+        parse_hex_color(&self.config.danger)
+    }
+
+    /// Background color with alpha
+    pub fn background(&self) -> Color {
+        parse_hex_color_with_alpha(&self.config.background, self.config.background_alpha)
+    }
+}
+
+impl From<&AppTheme> for Theme {
+    fn from(theme: &AppTheme) -> Self {
+        Theme::custom(
+            String::from("Clammy Theme"),
+            iced::theme::Palette {
+                background: Color::from_rgba(0.0, 0.0, 0.0, 0.0), // Transparent for bar
+                text: parse_hex_color(&theme.config.text),
+                primary: parse_hex_color_with_alpha(
+                    &theme.config.background,
+                    theme.config.background_alpha,
+                ),
+                success: parse_hex_color(&theme.config.success),
+                danger: parse_hex_color(&theme.config.danger),
+            },
+        )
     }
 }
