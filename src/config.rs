@@ -13,6 +13,19 @@ pub struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeConfig {
+    // Font (None = system monospace)
+    #[serde(default)]
+    pub font: Option<String>,
+    // Font size in pixels (default: 14)
+    #[serde(default = "default_font_size")]
+    pub font_size: f32,
+    // Spacing between tray widgets in pixels (default: 8)
+    #[serde(default = "default_tray_widget_spacing")]
+    pub tray_widget_spacing: f32,
+    // Horizontal padding inside each tray widget in pixels (default: 8)
+    #[serde(default = "default_tray_widget_padding")]
+    pub tray_widget_padding: f32,
+
     // Core palette (used by Iced theme)
     pub background: String,
     pub background_alpha: f32,
@@ -40,10 +53,26 @@ impl Default for Config {
     }
 }
 
+fn default_font_size() -> f32 {
+    14.0
+}
+
+fn default_tray_widget_spacing() -> f32 {
+    8.0
+}
+
+fn default_tray_widget_padding() -> f32 {
+    8.0
+}
+
 impl Default for ThemeConfig {
     fn default() -> Self {
         // Tokyo Night color scheme
         Self {
+            font: None, // Uses system monospace
+            font_size: default_font_size(),
+            tray_widget_spacing: default_tray_widget_spacing(),
+            tray_widget_padding: default_tray_widget_padding(),
             background: "#1a1b26".to_string(),
             background_alpha: 0.85,
             text: "#c0caf5".to_string(),

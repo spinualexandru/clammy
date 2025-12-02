@@ -1,7 +1,7 @@
 use chrono::Local;
-use iced::widget::{container, text};
-use iced::{Element, Subscription};
-use iced::{Length, time};
+use iced::{Element, Subscription, time};
+
+use super::tray_widget::tray_text;
 
 #[derive(Debug, Clone)]
 pub struct Clock {
@@ -38,16 +38,7 @@ impl Clock {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let clock_text = text(&self.formatted_buffer).style(
-            |theme: &iced::Theme| text::Style {
-                color: Some(theme.palette().text),
-            },
-        );
-
-        container(clock_text)
-            .center_y(Length::Fill)
-            .padding([0, 8])
-            .into()
+        tray_text(&self.formatted_buffer)
     }
 
     pub fn subscription(&self) -> Subscription<Message> {

@@ -2,21 +2,43 @@
 //!
 //! Handles:
 //! - ARGB32 to RGBA conversion for SNI pixmap data
-//! - Freedesktop icon theme lookup
+//! - Freedesktop icon theme lookup with caching
 //! - Custom icon theme path resolution
 
 use iced::widget::image;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::RwLock;
 use system_tray::item::{IconPixmap, StatusNotifierItem};
 
 /// Default icon size for the tray (in pixels).
 pub const ICON_SIZE: u16 = 22;
 
+/// Cache for icon path lookups to avoid repeated filesystem checks.
+/// Key: (theme_path, icon_name), Value: resolved path or None
+static ICON_CACHE: RwLock<Option<HashMap<(String, String), Option<PathBuf>>>> = RwLock::new(None);
+
+/// Initialize the icon cache if not already initialized.
+fn get_or_init_cache() -> &'static RwLock<Option<HashMap<(String, String), Option<PathBuf>>>> {
+    // Initialize on first access
+    if let Ok(guard) = ICON_CACHE.read() {
+        if guard.is_none() {
+            drop(guard);
+            if let Ok(mut guard) = ICON_CACHE.write() {
+                if guard.is_none() {
+                    *guard = Some(HashMap::new());
+                }
+            }
+        }
+    }
+    &ICON_CACHE
+}
+
 /// Resolve an icon from an SNI item to an Iced image handle.
 ///
 /// Resolution priority:
 /// 1. Icon pixmap (raw ARGB32 data from the app)
-/// 2. Icon name with custom theme path
+/// 2. Icon name with custom theme path (cached)
 /// 3. Icon name via freedesktop lookup
 pub fn resolve_icon(item: &StatusNotifierItem) -> Option<image::Handle> {
     // Priority 1: Try icon pixmap (raw ARGB32 data)
@@ -32,7 +54,7 @@ pub fn resolve_icon(item: &StatusNotifierItem) -> Option<image::Handle> {
             // Check custom theme path first
             if let Some(theme_path) = &item.icon_theme_path {
                 if !theme_path.is_empty() {
-                    if let Some(path) = find_icon_in_path(theme_path, icon_name) {
+                    if let Some(path) = find_icon_in_path_cached(theme_path, icon_name) {
                         return Some(image::Handle::from_path(path));
                     }
                 }
@@ -106,7 +128,34 @@ fn argb32_to_rgba(argb: &[u8], width: usize, height: usize) -> Vec<u8> {
 /// Most apps provide icon pixmaps or custom theme paths, so this fallback
 /// is rarely needed. If an icon doesn't appear, the app should provide pixmap data.
 fn lookup_freedesktop_icon(_name: &str) -> Option<PathBuf> {
-    None  // Disabled for memory optimization
+    None // Disabled for memory optimization
+}
+
+/// Find an icon in a custom theme path with caching.
+fn find_icon_in_path_cached(theme_path: &str, icon_name: &str) -> Option<PathBuf> {
+    let cache = get_or_init_cache();
+    let key = (theme_path.to_string(), icon_name.to_string());
+
+    // Check cache first
+    if let Ok(guard) = cache.read() {
+        if let Some(cache_map) = guard.as_ref() {
+            if let Some(cached) = cache_map.get(&key) {
+                return cached.clone();
+            }
+        }
+    }
+
+    // Not in cache, perform lookup
+    let result = find_icon_in_path(theme_path, icon_name);
+
+    // Store in cache
+    if let Ok(mut guard) = cache.write() {
+        if let Some(cache_map) = guard.as_mut() {
+            cache_map.insert(key, result.clone());
+        }
+    }
+
+    result
 }
 
 /// Find an icon in a custom theme path provided by the SNI item.

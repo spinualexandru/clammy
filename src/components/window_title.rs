@@ -1,9 +1,8 @@
-use hyprland::event_listener::AsyncEventListener;
-use iced::futures::SinkExt;
-use iced::stream;
 use iced::widget::text;
 use iced::{Element, Subscription};
-use std::future;
+
+use crate::hyprland_events::HyprlandSubscription;
+use crate::theme::get_theme;
 
 #[derive(Debug, Clone)]
 pub struct WindowTitle {
@@ -45,7 +44,9 @@ impl WindowTitle {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        let font_size = get_theme().font_size();
         text(&self.display_text)
+            .size(font_size)
             .style(|theme: &iced::Theme| {
                 text::Style {
                     color: Some(theme.palette().text),
@@ -55,33 +56,11 @@ impl WindowTitle {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        Subscription::run_with_id(
-            "hyprland-window-title-events",
-            stream::channel(100, |output| async move {
-                let mut listener = AsyncEventListener::new();
-
-                listener.add_active_window_changed_handler(move |data| {
-                    let mut output = output.clone();
-                    Box::pin(async move {
-                        if let Some(window) = data {
-                            let _ = output.send(Message::ActiveWindowChanged(
-                                Some(window.title),
-                                Some(window.class),
-                            )).await;
-                        } else {
-                            let _ = output.send(Message::ActiveWindowChanged(None, None)).await;
-                        }
-                    })
-                });
-
-                // Start the listener and keep it running
-                if let Err(e) = listener.start_listener_async().await {
-                    eprintln!("Hyprland window title listener error: {:?}", e);
-                }
-
-                // Keep the subscription alive indefinitely
-                future::pending::<()>().await;
-            }),
-        )
+        HyprlandSubscription::new("hyprland-window-title-events")
+            .on_active_window(|data| {
+                let (title, class) = data.map(|(t, c)| (Some(t), Some(c))).unwrap_or((None, None));
+                Message::ActiveWindowChanged(title, class)
+            })
+            .build()
     }
 }

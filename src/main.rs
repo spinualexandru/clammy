@@ -1,5 +1,7 @@
 mod components;
 mod config;
+mod hyprland_events;
+mod styles;
 mod theme;
 
 use std::collections::HashMap;
@@ -11,19 +13,27 @@ use iced::widget::{button, column, container, row, text};
 use iced::window::Id;
 use iced::{Border, Element, Font, Length, Subscription, Task};
 use iced_layershell::actions::{IcedNewMenuSettings, MenuDirection};
-use iced_layershell::build_pattern::{daemon, MainSettings};
+use iced_layershell::build_pattern::{MainSettings, daemon};
 use iced_layershell::reexport::{Anchor, Layer};
 use iced_layershell::settings::LayerShellSettings;
 use iced_layershell::to_layer_message;
 
-use crate::config::{config_subscription, Config, ConfigMessage};
-use crate::theme::{set_global_theme, AppTheme};
+use crate::config::{Config, ConfigMessage, config_subscription};
+use crate::theme::{AppTheme, set_global_theme};
+use components::battery;
 use components::clock;
 use components::system_tray;
 use components::window_title;
 use components::workspaces;
 
 pub fn main() -> Result<(), iced_layershell::Error> {
+    // Load config early to get font setting
+    let config = Config::load().unwrap_or_default();
+    let default_font = match &config.theme.font {
+        Some(name) => Font::with_name(Box::leak(name.clone().into_boxed_str())),
+        None => Font::MONOSPACE,
+    };
+
     daemon(
         StatusBar::namespace,
         StatusBar::update,
@@ -41,7 +51,7 @@ pub fn main() -> Result<(), iced_layershell::Error> {
             margin: (4, 4, 15, 4),
             ..LayerShellSettings::default()
         },
-        default_font: Font::with_name("IBM Plex Mono"),
+        default_font,
         antialiasing: true,
         ..MainSettings::default()
     })
@@ -58,6 +68,7 @@ enum WindowType {
 struct StatusBar {
     config: Config,
     app_theme: AppTheme,
+    battery: battery::Battery,
     clock: clock::Clock,
     workspaces: workspaces::Workspaces,
     window_title: window_title::WindowTitle,
@@ -71,6 +82,7 @@ struct StatusBar {
 #[to_layer_message(multi)]
 #[derive(Debug, Clone)]
 enum Message {
+    Battery(battery::Message),
     Clock(clock::Message),
     Workspaces(workspaces::Message),
     WindowTitle(window_title::Message),
@@ -110,6 +122,7 @@ impl StatusBar {
             Self {
                 config,
                 app_theme,
+                battery: battery::Battery::default(),
                 clock: clock::Clock::default(),
                 workspaces: workspaces::Workspaces::default(),
                 window_title: window_title::WindowTitle::default(),
@@ -139,6 +152,7 @@ impl StatusBar {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::Battery(msg) => self.battery.update(msg).map(Message::Battery),
             Message::Clock(msg) => {
                 self.clock.update(msg);
                 Task::none()
@@ -205,10 +219,7 @@ impl StatusBar {
                 menu_id,
             } => {
                 // Forward to system tray and close popup
-                let tray_msg = system_tray::Message::MenuItemClicked {
-                    address,
-                    menu_id,
-                };
+                let tray_msg = system_tray::Message::MenuItemClicked { address, menu_id };
                 let close_task = Task::done(Message::ClosePopup(popup_id));
                 let tray_task = self.system_tray.update(tray_msg).map(Message::SystemTray);
                 Task::batch([close_task, tray_task])
@@ -251,9 +262,10 @@ impl StatusBar {
             .style(|_theme| Style::default());
 
         let system_tray = self.system_tray.view().map(Message::SystemTray);
+        let battery = self.battery.view().map(Message::Battery);
         let clock = self.clock.view().map(Message::Clock);
-        let right = row![system_tray, clock]
-            .spacing(8)
+        let right = row![system_tray, battery, clock]
+            .spacing(self.app_theme.tray_widget_spacing())
             .align_y(iced::Alignment::Center);
 
         let content = row![left, middle, right,]
@@ -298,6 +310,7 @@ impl StatusBar {
         let text_color = self.app_theme.text();
         let muted_color = self.app_theme.muted();
         let surface_color = self.app_theme.surface();
+        let font_size = self.app_theme.font_size();
 
         let menu_items: Vec<Element<'_, Message>> = items
             .iter()
@@ -319,9 +332,9 @@ impl StatusBar {
 
                     // Use the label directly to avoid lifetime issues
                     let label_widget = if item.is_checkable && item.is_checked {
-                        text(format!(" {}", item.label)).size(13)
+                        text(format!(" {}", item.label)).size(font_size)
                     } else {
-                        text(&item.label).size(13)
+                        text(&item.label).size(font_size)
                     };
 
                     let mut btn = button(label_widget)
@@ -340,11 +353,7 @@ impl StatusBar {
                             };
                             button::Style {
                                 background: bg,
-                                text_color: if enabled {
-                                    text_color
-                                } else {
-                                    muted_color
-                                },
+                                text_color: if enabled { text_color } else { muted_color },
                                 border: Border::default(),
                                 shadow: Default::default(),
                             }
@@ -381,6 +390,7 @@ impl StatusBar {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch(vec![
+            self.battery.subscription().map(Message::Battery),
             self.clock.subscription().map(Message::Clock),
             self.workspaces.subscription().map(Message::Workspaces),
             self.window_title.subscription().map(Message::WindowTitle),

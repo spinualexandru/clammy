@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Clammy Configuration",
+  "description": "Configuration schema for Clammy status bar",
+  "type": "object",
+  "properties": {
+    "theme": {
+      "type": "object",
+      "description": "Theme and appearance settings",
+      "properties": {
+        "font": {
+          "type": "string",
+          "description": "Font family name. If not set, uses system monospace font.",
+          "examples": ["BlexMono Nerd Font Mono", "JetBrains Mono", "Fira Code"]
+        },
+        "font_size": {
+          "type": "number",
+          "description": "Font size in pixels",
+          "default": 14,
+          "minimum": 6,
+          "maximum": 48
+        },
+        "tray_widget_spacing": {
+          "type": "number",
+          "description": "Spacing between tray widgets (battery, clock, etc.) in pixels",
+          "default": 8,
+          "minimum": 0
+        },
+        "tray_widget_padding": {
+          "type": "number",
+          "description": "Horizontal padding inside each tray widget in pixels",
+          "default": 8,
+          "minimum": 0
+        },
+        "background": {
+          "type": "string",
+          "description": "Background color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#1a1b26"
+        },
+        "background_alpha": {
+          "type": "number",
+          "description": "Background transparency (0.0 = fully transparent, 1.0 = fully opaque)",
+          "default": 0.85,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "text": {
+          "type": "string",
+          "description": "Primary text color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#c0caf5"
+        },
+        "success": {
+          "type": "string",
+          "description": "Success/positive color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#9ece6a"
+        },
+        "danger": {
+          "type": "string",
+          "description": "Danger/error color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#f7768e"
+        },
+        "accent": {
+          "type": "string",
+          "description": "Primary accent color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#7aa2f7"
+        },
+        "accent2": {
+          "type": "string",
+          "description": "Secondary accent color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#bb9af7"
+        },
+        "info": {
+          "type": "string",
+          "description": "Info/highlight color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#7dcfff"
+        },
+        "surface": {
+          "type": "string",
+          "description": "Surface/card background color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#24283b"
+        },
+        "surface_alpha": {
+          "type": "number",
+          "description": "Surface transparency (0.0 = fully transparent, 1.0 = fully opaque)",
+          "default": 0.94,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "border": {
+          "type": "string",
+          "description": "Border color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#414868"
+        },
+        "muted": {
+          "type": "string",
+          "description": "Muted/disabled text color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#565f89"
+        },
+        "hover": {
+          "type": "string",
+          "description": "Hover state background color (hex format)",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#414868"
+        },
+        "hover_alpha": {
+          "type": "number",
+          "description": "Hover background transparency (0.0 = fully transparent, 1.0 = fully opaque)",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "background",
+        "background_alpha",
+        "text",
+        "success",
+        "danger",
+        "accent",
+        "accent2",
+        "info",
+        "surface",
+        "surface_alpha",
+        "border",
+        "muted",
+        "hover",
+        "hover_alpha"
+      ]
+    }
+  },
+  "required": ["theme"]
+}

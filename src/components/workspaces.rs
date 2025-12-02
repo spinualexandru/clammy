@@ -8,14 +8,11 @@
 
 use hyprland::data::{Workspace, Workspaces as HyprWorkspaces};
 use hyprland::dispatch::{Dispatch, DispatchType, WorkspaceIdentifierWithSpecial};
-use hyprland::event_listener::AsyncEventListener;
 use hyprland::shared::{HyprData, HyprDataActive, WorkspaceId};
-use iced::futures::SinkExt;
-use iced::stream;
 use iced::widget::{Row, button, container, row, stack, text};
 use iced::{Border, Element, Length, Subscription, Task};
-use std::future;
 
+use crate::hyprland_events::HyprlandSubscription;
 use crate::theme::get_theme;
 
 // ============================================================================
@@ -187,13 +184,9 @@ impl Workspaces {
 
     /// Subscribe to Hyprland workspace events.
     pub fn subscription(&self) -> Subscription<Message> {
-        let event_subscription = Subscription::run_with_id(
-            "hyprland-workspace-events",
-            stream::channel(100, |mut output| async move {
-                Self::run_event_listener(&mut output).await;
-                future::pending::<()>().await;
-            }),
-        );
+        let event_subscription = HyprlandSubscription::new("hyprland-workspace-events")
+            .on_any_workspace_event(|| Message::Refresh)
+            .build();
 
         // Add animation subscription when transition is in progress
         let animation_subscription = if self.animation_progress < 1.0 {
@@ -376,33 +369,4 @@ impl Workspaces {
         }
     }
 
-    /// Run the Hyprland event listener and send refresh messages on events.
-    async fn run_event_listener<S>(output: &mut S)
-    where
-        S: SinkExt<Message> + Clone + Unpin + Send + Sync + 'static,
-        S::Error: std::fmt::Debug,
-    {
-        let mut listener = AsyncEventListener::new();
-
-        // Helper to create event handlers with less boilerplate
-        let create_handler = |output: S| {
-            move |_| {
-                let mut output = output.clone();
-                Box::pin(async move {
-                    let _ = output.send(Message::Refresh).await;
-                })
-                    as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
-            }
-        };
-
-        // Register handlers for all workspace-related events
-        listener.add_workspace_added_handler(create_handler(output.clone()));
-        listener.add_workspace_deleted_handler(create_handler(output.clone()));
-        listener.add_workspace_changed_handler(create_handler(output.clone()));
-
-        // Start listening for events
-        if let Err(e) = listener.start_listener_async().await {
-            eprintln!("Hyprland event listener error: {:?}", e);
-        }
-    }
 }
