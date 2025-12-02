@@ -4,6 +4,42 @@
 https://github.com/user-attachments/assets/dd026482-48a2-48a3-9e8e-ecca2be73ee3
 
 
+## Configuration
+
+Configuration should be placed in the `~/.config/clammy/config.toml` file.
+
+Defaults for the color scheme is a tokyo night inspired color scheme.
+
+```toml
+[theme]
+
+# Font
+font = "BlexMono Nerd Font Mono" # Default is monospace
+font_size = 16 # Default is 16
+
+# Spacings
+tray_widget_spacing = 0 # Default is 8
+tray_widget_padding = 4 # Default is 8
+
+# Core palette
+background = "#f5fafe"
+background_alpha = 0.85
+text = "#171c1f"
+success = "#8b5000"
+danger = "#ba1a1a"
+
+# Extended colors
+accent = "#006686"
+accent2 = "#3d6376"
+info = "#8b5000"
+surface = "#eaeef2"
+surface_alpha = 0.94
+border = "#6e797f"
+muted = "#bdc8cf"
+hover = "#e4e9ed"
+hover_alpha = 0.5
+```
+
 ## Roadmap
 
 ### Widgets
