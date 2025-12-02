@@ -3,12 +3,36 @@
 
 https://github.com/user-attachments/assets/dd026482-48a2-48a3-9e8e-ecca2be73ee3
 
+## Prerequisites
+- Rust
+- Cargo
+- Git
+
+## Quickstart
+- Clone the repository (`git clone https://github.com/spinualexandru/clammy`)
+- Navigate to the cloned directory (`cd clammy`)
+- Run `cargo install --path .`
+- Run `clammy` in the terminal
+
+## Features
+
+### General
+- Sync colors from Matugen
+- Hotreload config
+
+### Widgets
+- Clock
+- Battery
+- Window title
+- Workspaces
 
 ## Configuration
 
 Configuration should be placed in the `~/.config/clammy/config.toml` file.
 
 Defaults for the color scheme is a tokyo night inspired color scheme.
+
+Matugen example can be found in the `./docs/config.toml` file.
 
 ```toml
 [theme]
