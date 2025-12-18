@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use iced::event::{self, Event};
 use iced::keyboard::{self, key::Named};
+use iced::border::Radius;
 use iced::widget::container::Style;
 use iced::widget::{button, column, container, row, text};
 use iced::window::Id;
@@ -22,6 +23,7 @@ use crate::config::{Config, ConfigMessage, config_subscription};
 use crate::theme::{AppTheme, set_global_theme};
 use components::battery;
 use components::clock;
+use components::notification_toggle;
 use components::system_tray;
 use components::window_title;
 use components::workspaces;
@@ -65,11 +67,21 @@ enum WindowType {
     TrayMenu,
 }
 
+/// Animation state for dropdown menus
+#[derive(Debug, Clone)]
+struct PopupAnimationState {
+    /// Progress from 0.0 (closed) to 1.0 (fully open)
+    progress: f32,
+    /// Total height of menu content
+    content_height: f32,
+}
+
 struct StatusBar {
     config: Config,
     app_theme: AppTheme,
     battery: battery::Battery,
     clock: clock::Clock,
+    notification_toggle: notification_toggle::NotificationToggle,
     workspaces: workspaces::Workspaces,
     window_title: window_title::WindowTitle,
     system_tray: system_tray::SystemTray,
@@ -77,6 +89,8 @@ struct StatusBar {
     windows: HashMap<Id, WindowType>,
     /// Store menu data for popup windows (keyed by popup ID)
     menu_data: HashMap<Id, (String, Vec<system_tray::menu::MenuItem>)>,
+    /// Animation state for popup windows
+    popup_animations: HashMap<Id, PopupAnimationState>,
 }
 
 #[to_layer_message(multi)]
@@ -84,6 +98,7 @@ struct StatusBar {
 enum Message {
     Battery(battery::Message),
     Clock(clock::Message),
+    NotificationToggle(notification_toggle::Message),
     Workspaces(workspaces::Message),
     WindowTitle(window_title::Message),
     SystemTray(system_tray::Message),
@@ -104,6 +119,8 @@ enum Message {
     },
     /// Global event for keyboard/mouse handling
     IcedEvent(Event),
+    /// Animation tick for popup slide-down
+    PopupAnimationTick,
 }
 
 impl StatusBar {
@@ -124,11 +141,13 @@ impl StatusBar {
                 app_theme,
                 battery: battery::Battery::default(),
                 clock: clock::Clock::default(),
+                notification_toggle: notification_toggle::NotificationToggle::default(),
                 workspaces: workspaces::Workspaces::default(),
                 window_title: window_title::WindowTitle::default(),
                 system_tray: system_tray::SystemTray::default(),
                 windows: HashMap::new(),
                 menu_data: HashMap::new(),
+                popup_animations: HashMap::new(),
             },
             Task::done(workspaces::Message::Refresh).map(Message::Workspaces),
         )
@@ -146,6 +165,7 @@ impl StatusBar {
         if let Some(window_type) = self.windows.remove(&id) {
             if matches!(window_type, WindowType::TrayMenu) {
                 self.menu_data.remove(&id);
+                self.popup_animations.remove(&id);
             }
         }
     }
@@ -156,6 +176,9 @@ impl StatusBar {
             Message::Clock(msg) => {
                 self.clock.update(msg);
                 Task::none()
+            }
+            Message::NotificationToggle(msg) => {
+                self.notification_toggle.update(msg).map(Message::NotificationToggle)
             }
             Message::Workspaces(msg) => self.workspaces.update(msg).map(Message::Workspaces),
             Message::WindowTitle(msg) => {
@@ -193,13 +216,25 @@ impl StatusBar {
                 // Create popup window
                 let id = Id::unique();
 
-                // Calculate menu height (roughly 24px per item + padding)
+                // Calculate menu height (roughly 28px per item + padding)
                 let item_count = items.len();
-                let height = (item_count as u32 * 28) + 16;
+                let menu_height = (item_count as u32 * 28) + 16;
+                // Add 18px top offset + 4px connector height
+                let height = menu_height + 22;
+                let content_height = menu_height as f32;
 
                 // Store menu data keyed by popup ID
                 self.menu_data.insert(id, (address, items));
                 self.windows.insert(id, WindowType::TrayMenu);
+
+                // Initialize animation state - starts at 0.0
+                self.popup_animations.insert(
+                    id,
+                    PopupAnimationState {
+                        progress: 0.0,
+                        content_height,
+                    },
+                );
 
                 Task::done(Message::NewMenu {
                     settings: IcedNewMenuSettings {
@@ -242,6 +277,18 @@ impl StatusBar {
                 }
                 Task::none()
             }
+            Message::PopupAnimationTick => {
+                // Find the first animating popup and advance it
+                if let Some((_, anim)) = self
+                    .popup_animations
+                    .iter_mut()
+                    .find(|(_, a)| a.progress < 1.0)
+                {
+                    // Ease-out quadratic for smoother animation
+                    anim.progress = (anim.progress + 0.15).min(1.0);
+                }
+                Task::none()
+            }
             _ => Task::none(), // Handle layer shell messages
         }
     }
@@ -264,7 +311,8 @@ impl StatusBar {
         let system_tray = self.system_tray.view().map(Message::SystemTray);
         let battery = self.battery.view().map(Message::Battery);
         let clock = self.clock.view().map(Message::Clock);
-        let right = row![system_tray, battery, clock]
+        let notification_toggle = self.notification_toggle.view().map(Message::NotificationToggle);
+        let right = row![system_tray, battery, clock, notification_toggle]
             .spacing(self.app_theme.tray_widget_spacing())
             .align_y(iced::Alignment::Center);
 
@@ -305,11 +353,23 @@ impl StatusBar {
             }
         };
 
+        // Get animation progress (default to 1.0 = fully visible)
+        let (progress, content_height) = self
+            .popup_animations
+            .get(&popup_id)
+            .map(|anim| {
+                // Ease-out quadratic for smoother feel
+                let eased = 1.0 - (1.0 - anim.progress).powi(2);
+                (eased, anim.content_height)
+            })
+            .unwrap_or((1.0, 100.0));
+
         let border_color = self.app_theme.border();
         let hover_color = self.app_theme.hover();
         let text_color = self.app_theme.text();
         let muted_color = self.app_theme.muted();
         let surface_color = self.app_theme.surface();
+        let accent_color = self.app_theme.accent();
         let font_size = self.app_theme.font_size();
 
         let menu_items: Vec<Element<'_, Message>> = items
@@ -330,7 +390,6 @@ impl StatusBar {
                     let item_id = item.id;
                     let enabled = item.enabled;
 
-                    // Use the label directly to avoid lifetime issues
                     let label_widget = if item.is_checkable && item.is_checked {
                         text(format!(" {}", item.label)).size(font_size)
                     } else {
@@ -372,31 +431,92 @@ impl StatusBar {
             })
             .collect();
 
-        container(column(menu_items).spacing(0).width(Length::Fill))
+        let menu_column = column(menu_items).spacing(0).width(Length::Fill);
+
+        // Animated height - clip content by showing only a portion
+        let visible_height = (content_height * progress).max(1.0);
+
+        // Small connector tab at top to bridge gap with status bar
+        let connector = container(iced::widget::Space::new(Length::Fill, 0))
+            .width(Length::Fixed(40.0))
+            .height(Length::Fixed(4.0))
+            .style(move |_theme| container::Style {
+                background: Some(accent_color.into()),
+                border: Border {
+                    radius: Radius {
+                        top_left: 2.0,
+                        top_right: 2.0,
+                        bottom_left: 0.0,
+                        bottom_right: 0.0,
+                    },
+                    ..Border::default()
+                },
+                ..Default::default()
+            });
+
+        // Menu content container with clipped height for animation
+        let menu_container = container(menu_column)
             .width(Length::Fill)
-            .height(Length::Fill)
+            .height(Length::Fixed(visible_height))
+            .clip(true)
             .padding(4)
             .style(move |_theme| container::Style {
                 background: Some(surface_color.into()),
                 border: Border {
-                    color: border_color,
+                    color: accent_color,
                     width: 1.0,
-                    radius: 6.0.into(),
+                    radius: Radius {
+                        top_left: 6.0,
+                        top_right: 6.0,
+                        bottom_left: 6.0,
+                        bottom_right: 6.0,
+                    },
                 },
                 ..Default::default()
-            })
+            });
+
+        // Add top spacing to offset from bar center to bar bottom
+        // Bar is 36px, menu appears at center (18px), so add ~18px offset
+        let top_spacer = iced::widget::Space::new(Length::Fill, Length::Fixed(18.0));
+
+        // Stack: spacer, connector, menu
+        let content = column![
+            top_spacer,
+            container(connector).width(Length::Fill).center_x(Length::Fill),
+            menu_container,
+        ]
+        .spacing(0);
+
+        container(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
             .into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
+        // Animation subscription only active when a popup is animating
+        let has_animating = self
+            .popup_animations
+            .values()
+            .any(|anim| anim.progress < 1.0);
+
+        let animation_subscription = if has_animating {
+            iced::time::every(std::time::Duration::from_millis(16))
+                .map(|_| Message::PopupAnimationTick)
+        } else {
+            Subscription::none()
+        };
+
         Subscription::batch(vec![
             self.battery.subscription().map(Message::Battery),
             self.clock.subscription().map(Message::Clock),
+            self.notification_toggle.subscription().map(Message::NotificationToggle),
             self.workspaces.subscription().map(Message::Workspaces),
             self.window_title.subscription().map(Message::WindowTitle),
             self.system_tray.subscription().map(Message::SystemTray),
             config_subscription().map(Message::ConfigChanged),
             event::listen().map(Message::IcedEvent),
+            animation_subscription,
         ])
     }
 }
