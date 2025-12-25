@@ -22,9 +22,7 @@ impl NotificationToggle {
     }
 
     async fn toggle_panel() {
-        let _ = Command::new("swaync-client")
-            .arg("--toggle-panel")
-            .spawn();
+        let _ = Command::new("swaync-client").arg("--toggle-panel").spawn();
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -44,7 +42,7 @@ impl NotificationToggle {
                 button::Style {
                     background: bg,
                     border: Border {
-                        radius: 4.0.into(),
+                        radius: 2.0.into(),
                         ..Border::default()
                     },
                     text_color,
