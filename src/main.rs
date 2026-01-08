@@ -10,7 +10,7 @@ use iced::event::{self, Event};
 use iced::keyboard::{self, key::Named};
 use iced::border::Radius;
 use iced::widget::container::Style;
-use iced::widget::{button, column, container, row, text};
+use iced::widget::{button, column, container, row, scrollable, text};
 use iced::window::Id;
 use iced::{Border, Element, Font, Length, Subscription, Task};
 use iced_layershell::actions::{IcedNewMenuSettings, MenuDirection};
@@ -25,6 +25,7 @@ use components::battery;
 use components::clock;
 use components::notification_toggle;
 use components::system_tray;
+use components::volume;
 use components::window_title;
 use components::workspaces;
 
@@ -81,6 +82,7 @@ struct StatusBar {
     app_theme: AppTheme,
     battery: battery::Battery,
     clock: clock::Clock,
+    volume: volume::Volume,
     notification_toggle: notification_toggle::NotificationToggle,
     workspaces: workspaces::Workspaces,
     window_title: window_title::WindowTitle,
@@ -98,6 +100,7 @@ struct StatusBar {
 enum Message {
     Battery(battery::Message),
     Clock(clock::Message),
+    Volume(volume::Message),
     NotificationToggle(notification_toggle::Message),
     Workspaces(workspaces::Message),
     WindowTitle(window_title::Message),
@@ -141,6 +144,7 @@ impl StatusBar {
                 app_theme,
                 battery: battery::Battery::default(),
                 clock: clock::Clock::default(),
+                volume: volume::Volume::default(),
                 notification_toggle: notification_toggle::NotificationToggle::default(),
                 workspaces: workspaces::Workspaces::default(),
                 window_title: window_title::WindowTitle::default(),
@@ -177,6 +181,7 @@ impl StatusBar {
                 self.clock.update(msg);
                 Task::none()
             }
+            Message::Volume(msg) => self.volume.update(msg).map(Message::Volume),
             Message::NotificationToggle(msg) => {
                 self.notification_toggle.update(msg).map(Message::NotificationToggle)
             }
@@ -216,12 +221,11 @@ impl StatusBar {
                 // Create popup window
                 let id = Id::unique();
 
-                // Calculate menu height (roughly 28px per item + padding)
-                let item_count = items.len();
-                let menu_height = (item_count as u32 * 28) + 16;
+                // Calculate menu height
+                let menu_height = system_tray::menu::calculate_height(&items, self.app_theme.font_size()) + 16.0;
                 // Add 18px top offset + 4px connector height
-                let height = menu_height + 22;
-                let content_height = menu_height as f32;
+                let height = menu_height + 22.0;
+                let content_height = menu_height;
 
                 // Store menu data keyed by popup ID
                 self.menu_data.insert(id, (address, items));
@@ -238,7 +242,7 @@ impl StatusBar {
 
                 Task::done(Message::NewMenu {
                     settings: IcedNewMenuSettings {
-                        size: (200, height.min(400)),
+                        size: (200, height.min(400.0) as u32),
                         direction: MenuDirection::Down,
                     },
                     id,
@@ -311,8 +315,9 @@ impl StatusBar {
         let system_tray = self.system_tray.view().map(Message::SystemTray);
         let battery = self.battery.view().map(Message::Battery);
         let clock = self.clock.view().map(Message::Clock);
+        let volume = self.volume.view().map(Message::Volume);
         let notification_toggle = self.notification_toggle.view().map(Message::NotificationToggle);
-        let right = row![system_tray, battery, clock, notification_toggle]
+        let right = row![system_tray, volume, battery, clock, notification_toggle]
             .spacing(self.app_theme.tray_widget_spacing())
             .align_y(iced::Alignment::Center);
 
@@ -432,6 +437,7 @@ impl StatusBar {
             .collect();
 
         let menu_column = column(menu_items).spacing(0).width(Length::Fill);
+        let scroll_content = scrollable(menu_column).height(Length::Fill);
 
         // Animated height - clip content by showing only a portion
         let visible_height = (content_height * progress).max(1.0);
@@ -455,7 +461,7 @@ impl StatusBar {
             });
 
         // Menu content container with clipped height for animation
-        let menu_container = container(menu_column)
+        let menu_container = container(scroll_content)
             .width(Length::Fill)
             .height(Length::Fixed(visible_height))
             .clip(true)
@@ -510,6 +516,7 @@ impl StatusBar {
         Subscription::batch(vec![
             self.battery.subscription().map(Message::Battery),
             self.clock.subscription().map(Message::Clock),
+            self.volume.subscription().map(Message::Volume),
             self.notification_toggle.subscription().map(Message::NotificationToggle),
             self.workspaces.subscription().map(Message::Workspaces),
             self.window_title.subscription().map(Message::WindowTitle),

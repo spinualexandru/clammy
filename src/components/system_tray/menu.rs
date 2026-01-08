@@ -67,6 +67,22 @@ fn convert_menu_item(item: &SniMenuItem, depth: usize) -> MenuItem {
     }
 }
 
+/// Calculate the estimated height of the menu based on items and font size.
+pub fn calculate_height(items: &[MenuItem], font_size: f32) -> f32 {
+    let mut height = 0.0;
+    for item in items {
+        if item.is_separator {
+            // 1px height + 4px top padding + 4px bottom padding
+            height += 9.0;
+        } else {
+            // Text height (approx font_size) + 6px top padding + 6px bottom padding
+            // We add a small buffer (4px) for potential font metrics differences
+            height += font_size + 16.0;
+        }
+    }
+    height
+}
+
 /// Message type for menu interactions.
 #[derive(Debug, Clone)]
 pub enum MenuMessage {
